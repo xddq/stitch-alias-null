@@ -1,0 +1,19 @@
+# These types have the same attribute name but different types. They will result
+# in an error when querying the stitched chema with fragment aliases.
+union DynamicZone = TitleOne | TitleTwo
+
+type TitleOne {
+  text: String!
+}
+
+type TitleTwo {
+  text: Int
+}
+
+type Article {
+  title: DynamicZone
+}
+
+type Query {
+  articles: [Article!]
+}
