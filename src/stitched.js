@@ -30,6 +30,10 @@ const main = async () => {
   // spin up server with the resulting schema.
   const server = new ApolloServer({
     schema: stitchedSchema,
+    context: (params) => () => {
+      console.log("stitched query: ", params.req.body.query);
+      console.log("stitched variables: ", params.req.body.variables);
+    },
     plugins: [
       // enables the GraphQL playground. Will be reachable at via /graphql by
       // default.

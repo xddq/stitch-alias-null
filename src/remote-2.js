@@ -27,6 +27,10 @@ const main = async () => {
   const server = new ApolloServer({
     typeDefs,
     resolvers,
+    context: (params) => () => {
+      console.log("remote-2 query: ", params.req.body.query);
+      console.log("remote-2 variables: ", params.req.body.variables);
+    },
     plugins: [
       // enables the GraphQL playground. Will be reachable at via /graphql by
       // default.
