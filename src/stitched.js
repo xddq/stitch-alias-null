@@ -27,14 +27,35 @@ const main = async () => {
     ],
   });
 
+  // plugin for logging:
+  // src: https://www.apollographql.com/docs/apollo-server/integrations/plugins
+  const logging = {
+    requestDidStart(requestContext) {
+      console.log("stitched request: ", requestContext.request.query);
+      console.log("stitched variables:", requestContext.request.variables);
+      return {
+        didEncounterErrors(requestContext) {
+          console.log(
+            "an error happened in response to query " +
+              requestContext.request.query
+          );
+          console.log(requestContext.errors);
+        },
+        willSendResponse(response, ctx) {
+          console.log(
+            "stitched response:",
+            JSON.stringify(response.response.data)
+          );
+        },
+      };
+    },
+  };
+
   // spin up server with the resulting schema.
   const server = new ApolloServer({
     schema: stitchedSchema,
-    context: (params) => () => {
-      console.log("stitched query: ", params.req.body.query);
-      console.log("stitched variables: ", params.req.body.variables);
-    },
     plugins: [
+      logging,
       // enables the GraphQL playground. Will be reachable at via /graphql by
       // default.
       ApolloServerPluginLandingPageGraphQLPlayground(),
