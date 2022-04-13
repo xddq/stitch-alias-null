@@ -16,4 +16,5 @@ type Article {
 
 type Query {
   articles: [Article!]
+  _sdl: String!
 }

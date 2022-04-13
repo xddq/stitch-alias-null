@@ -45,6 +45,7 @@ const resolvers = {
     articles: (_root, _args, _ctx, _info) => {
       return allArticles;
     },
+    _sdl: () => typeDefs,
   },
   DynamicZone: {
     __resolveType: (root, _args, _ctx, _info) => {

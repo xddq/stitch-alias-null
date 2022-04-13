@@ -1,11 +1,45 @@
 const { stitchSchemas } = require("@graphql-tools/stitch");
-const { loadSchema } = require("@graphql-tools/load");
 const { ApolloServer } = require("apollo-server");
+const { loadSchema } = require("@graphql-tools/load");
+const { buildSchema } = require("graphql");
 const { UrlLoader } = require("@graphql-tools/url-loader");
+const { RenameTypes, RenameRootFields } = require("@graphql-tools/wrap");
 
 const {
   ApolloServerPluginLandingPageGraphQLPlayground,
 } = require("apollo-server-core");
+
+// try loading remote schemas differently:
+// inspired from: https://github.com/gmac/schema-stitching-handbook/blob/main/combining-local-and-remote-schemas/index.js
+const { fetch } = require("cross-fetch");
+const { print } = require("graphql");
+
+// Builds a remote schema executor function,
+// customize any way that you need (auth, headers, etc).
+// Expects to receive an object with "document" and "variable" params,
+// and asynchronously returns a JSON response from the remote.
+function makeRemoteExecutor(url) {
+  return async ({ document, variables, context }) => {
+    const query = typeof document === "string" ? document : print(document);
+    const fetchResult = await fetch(url, {
+      method: "POST",
+      headers: {
+        // 'Authorization': context.authHeader,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    return fetchResult.json();
+  };
+}
+
+// Custom fetcher that queries a remote schema for an "sdl" field.
+// This is NOT a standard GraphQL convention – it's just a simple way
+// for a remote API to provide its own schema, complete with custom directives.
+async function fetchRemoteSDL(executor, context) {
+  const result = await executor({ document: "{ _sdl }", context });
+  return result.data._sdl;
+}
 
 // wrapper to enable "top level await"
 const main = async () => {
@@ -17,13 +51,35 @@ const main = async () => {
     loaders: [new UrlLoader()],
   });
 
+  // required
+  const remoteOneExecutor = makeRemoteExecutor("http://localhost:4001/graphql");
+  const remoteTwoExecutor = makeRemoteExecutor("http://localhost:4002/graphql");
+
+  const remoteOneSchemaWithoutLoadSchema = buildSchema(
+    await fetchRemoteSDL(remoteOneExecutor, {})
+  );
+
   // combine remote schemas
   const stitchedSchema = stitchSchemas({
     subschemas: [
       {
         schema: remoteOneSchema,
+        executor: remoteOneExecutor,
       },
-      { schema: remoteTwoSchema },
+      {
+        schema: remoteOneSchemaWithoutLoadSchema,
+        executor: remoteOneExecutor,
+        transforms: [
+          new RenameTypes((typeName, fieldName) => `fetchRemoteSDL${typeName}`),
+          new RenameRootFields(
+            (typeName, fieldName) =>
+              `fetchRemoteSDL${fieldName
+                .charAt(0)
+                .toUpperCase()}${fieldName.slice(1)}`
+          ),
+        ],
+      },
+      { schema: remoteTwoSchema, executor: remoteTwoExecutor },
     ],
   });
 
